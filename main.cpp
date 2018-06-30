@@ -76,9 +76,9 @@ class Rectangle {
     }
 };
 
-void usage(){
+void usage(int argc, char* argv[]){
   cout << "Usage: ";
-  cout << "./main.out image.jpg" << endl;
+  cout << argv[0] << " input.jpg output.jpg" << endl;
 }
 
 static double angle( Point pt1, Point pt2, Point pt0 )
@@ -156,6 +156,7 @@ void find_rectangles(Mat& image, vector<vector<Point> >& rectangles)
     }
 }
 
+/*
 static int getPointIndex(vector<Point>& vp, Point2f& p){
   for(size_t i=0; i<vp.size(); i++){
     if(vp[i].x == p.x && vp[i].y == p.y){
@@ -164,6 +165,7 @@ static int getPointIndex(vector<Point>& vp, Point2f& p){
   }
   return -1;
 }
+*/
 
 template <class T> static Mat* drawRectangles(Mat& image, Mat& originalImage, set<Rectangle, T>& rectangles, int rows, int cols )
 {
@@ -292,7 +294,7 @@ int main(int argc, char* argv[]){
   Mat image;
   if(argc < 2){
     cerr << "Invalid input" << endl;
-    usage();
+    usage(argc, argv);
     return 1;
   }
   image = imread(argv[1], CV_LOAD_IMAGE_COLOR);
