@@ -14,29 +14,25 @@ using namespace std;
 
 const char* wndname = "Paper Fix";
 
-static double calculateArea(const vector<Point>& square) {
-  int n = square.size();
-
-  cout << "Square points: " << n << endl;
-  
+static double calculateArea(const vector<Point>& rectangle) {
   Point prevPoint;
   double area1, area2;
 
-  double ab = sqrt(pow(square[0].x - square[1].x,2) + pow(square[0].y - square[1].y,2));
-  double bc = sqrt(pow(square[1].x - square[2].x,2) + pow(square[1].y - square[2].y,2));
+  double ab = sqrt(pow(rectangle[0].x - rectangle[1].x,2) + pow(rectangle[0].y - rectangle[1].y,2));
+  double bc = sqrt(pow(rectangle[1].x - rectangle[2].x,2) + pow(rectangle[1].y - rectangle[2].y,2));
   area1 = (ab + bc) / 2.0;
 
-  double cd = sqrt(pow(square[2].x - square[3].x,2) + pow(square[2].y - square[3].y, 2));
-  double ad = sqrt(pow(square[3].x - square[0].x, 2) + pow(square[3].y - square[0].y,2));
+  double cd = sqrt(pow(rectangle[2].x - rectangle[3].x,2) + pow(rectangle[2].y - rectangle[3].y, 2));
+  double ad = sqrt(pow(rectangle[3].x - rectangle[0].x, 2) + pow(rectangle[3].y - rectangle[0].y,2));
   area2 = (cd + ad) / 2.0;
 
   return area1 + area2;
 }
 
 
-class Square {
+class Rectangle {
   public:
-    Square(vector<Point> v) : m_v{v} {
+    Rectangle(vector<Point> v) : m_v{v} {
       for(Point& p: v){
         cout << p << ",";
       }
@@ -58,7 +54,7 @@ class Square {
       return m_v;
     }
 
-    bool equals(const Square& o) const {
+    bool equals(const Rectangle& o) const {
       for(size_t i=0; i<o.m_v.size(); i++){
         if(m_v[i].x != o.m_v[i].x){
           return false;
@@ -94,7 +90,7 @@ static double angle( Point pt1, Point pt2, Point pt0 )
     return (dx1*dx2 + dy1*dy2)/sqrt((dx1*dx1 + dy1*dy1)*(dx2*dx2 + dy2*dy2) + 1e-10);
 }
 
-void find_squares(Mat& image, vector<vector<Point> >& squares)
+void find_rectangles(Mat& image, vector<vector<Point> >& rectangles)
 {
     // blur will enhance edge detection
     Mat blurred(image);
@@ -103,7 +99,7 @@ void find_squares(Mat& image, vector<vector<Point> >& squares)
     Mat gray0(blurred.size(), CV_8U), gray;
     vector<vector<Point>> contours;
 
-    // find squares in every color plane of the image
+    // find rectangles in every color plane of the image
     for (int c = 0; c < 3; c++)
     {
         int ch[] = {c, 0};
@@ -114,7 +110,7 @@ void find_squares(Mat& image, vector<vector<Point> >& squares)
         for (int l = 0; l < threshold_level; l++)
         {
             // Use Canny instead of zero threshold level!
-            // Canny helps to catch squares with gradient shading
+            // Canny helps to catch rectangles with gradient shading
             if (l == 0)
             {
                 Canny(gray0, gray, 10, 20, 3); //
@@ -153,28 +149,27 @@ void find_squares(Mat& image, vector<vector<Point> >& squares)
                             }
 
                             if (maxCosine < 0.3)
-                              squares.push_back(approx);
+                              rectangles.push_back(approx);
                     }
             }
         }
     }
 }
 
-template <class T> static void drawSquares( Mat& image, set<Square, T>& squares, int rows, int cols )
+template <class T> static void drawRectangles( Mat& image, set<Rectangle, T>& rectangles, int rows, int cols )
 {
-    auto cmp = [](Square& f, Square& s) { return f.area() <= s.area(); };
-    priority_queue<Square, std::vector<Square>, decltype(cmp)> pq(cmp);
+    auto cmp = [](Rectangle& f, Rectangle& s) { return f.area() <= s.area(); };
+    priority_queue<Rectangle, std::vector<Rectangle>, decltype(cmp)> pq(cmp);
     
     int i = 0;
 
-    cout << "Squares.size = " << squares.size() << endl;
+    cout << "Rectangles.size = " << rectangles.size() << endl;
 
-    for(const Square& s : squares)
+    for(const Rectangle& s : rectangles)
     {
-        cout << "PQ pushing..." << endl;
         pq.push(s);
         double area = s.area();
-        cout << "Square " << i << ": Area = " << area << endl;
+        cout << "Rectangle " << i << ": Area = " << area << endl;
         i++;
     }
 
@@ -184,15 +179,9 @@ template <class T> static void drawSquares( Mat& image, set<Square, T>& squares,
       Scalar(0,0,255), Scalar(255,0,0)};
 
     while(!pq.empty() && count < 3){
-      const Square& s = pq.top();
+      const Rectangle& s = pq.top();
       pq.pop();
       vector<Point> points = s.vec();
-
-      for(Point& p : points){
-          cout << p << ",";
-      }
-
-      cout << endl;
 
       const Point* p = &(points[0]);
       int n = (int) s.size();
@@ -207,10 +196,7 @@ template <class T> static void drawSquares( Mat& image, set<Square, T>& squares,
 
       if (p-> x > 3 && p->y > 3 && insideOrigImage){
         
-        // Get Rotated Rect
-        //RotatedRect rect {points[1], points[2], points[3]};
-        //cout << "Angle: " << rect.angle << endl;
-
+        cout << "Rectangle points: " << points << endl;
         cout << "Drawing line..." << endl;
         polylines(image, &p, &n, 1, true, colorArr[count%3], 3, LINE_AA);
         count++;
@@ -232,6 +218,10 @@ static Mat* expandImage( Mat& src ){
   return dst;
 }
 
+double distance(Point& p1, Point& p2){
+  return sqrt(pow(p1.x - p2.x, 2) + pow(p1.y - p2.y, 2));
+}
+
 int main(int argc, char* argv[]){
   Mat image;
   if(argc < 2){
@@ -249,17 +239,29 @@ int main(int argc, char* argv[]){
   //Mat gray_image;
   //cvtColor( image, gray_image, CV_BGR2GRAY );
   
-  vector<vector<Point>> squares;
+  vector<vector<Point>> rectangles;
   Mat expandedImage = *expandImage(image);
-  find_squares(expandedImage, squares);
+  find_rectangles(expandedImage, rectangles);
 
-  auto cmp = [](Square a, Square b) { return !a.equals(b); };
-  set<Square, decltype(cmp)> theSquares(cmp);
-  for(vector<Point> p : squares){
-    cout << "Inserting Square..." << endl;
-    theSquares.insert(Square(p));
+  auto cmp = [](Rectangle a, Rectangle b) { return !a.equals(b); };
+  set<Rectangle, decltype(cmp)> theRectangles(cmp);
+
+  //vector<Point> paper_limits = {Point(0,0), 
+  
+  Point topLeft {(int) (0.05*image.cols), (int) (0.05*image.rows)};
+  Point bottomLeft {(int) (0.05*image.cols), (int) (1.05*image.rows)};
+
+  cout << "Top: " << topLeft << ", BottomLeft: " << bottomLeft << endl;
+
+  for(vector<Point> p : rectangles){
+    cout << p << endl;
+    if(distance(p[0],topLeft) < 5 && distance(p[1],bottomLeft) < 5){
+      cout << "Ignoring this rectangle because it's basically a rectangle containing our picture." << endl;
+      continue;
+    }
+    theRectangles.insert(Rectangle(p));
   }
-  drawSquares(expandedImage, theSquares, image.rows, image.cols);
+  drawRectangles(expandedImage, theRectangles, image.rows, image.cols);
 
   
   imwrite("output.jpg", expandedImage);
