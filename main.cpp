@@ -33,10 +33,10 @@ static double calculateArea(const vector<Point>& rectangle) {
 class Rectangle {
   public:
     Rectangle(vector<Point> v) : m_v{v} {
-      for(Point& p: v){
+      /*for(Point& p: v){
         cout << p << ",";
       }
-      cout << endl;
+      cout << endl;*/
       computeArea();
     }
     double area() const {
@@ -156,20 +156,29 @@ void find_rectangles(Mat& image, vector<vector<Point> >& rectangles)
     }
 }
 
-template <class T> static double drawRectangles( Mat& image, set<Rectangle, T>& rectangles, int rows, int cols )
+static int getPointIndex(vector<Point>& vp, Point2f& p){
+  for(size_t i=0; i<vp.size(); i++){
+    if(vp[i].x == p.x && vp[i].y == p.y){
+      return i;
+    }
+  }
+  return -1;
+}
+
+template <class T> static Mat* drawRectangles(Mat& image, Mat& originalImage, set<Rectangle, T>& rectangles, int rows, int cols )
 {
     auto cmp = [](Rectangle& f, Rectangle& s) { return f.area() <= s.area(); };
     priority_queue<Rectangle, std::vector<Rectangle>, decltype(cmp)> pq(cmp);
     double rotation = 0;
     int i = 0;
 
-    cout << "Rectangles.size = " << rectangles.size() << endl;
+    cout << "Found " << rectangles.size() << " rectangles" << endl;
 
     for(const Rectangle& s : rectangles)
     {
         pq.push(s);
-        double area = s.area();
-        cout << "Rectangle " << i << ": Area = " << area << endl;
+        //double area = s.area();
+        //cout << "Rectangle " << i << ": Area = " << area << endl;
         i++;
     }
 
@@ -195,18 +204,66 @@ template <class T> static double drawRectangles( Mat& image, set<Rectangle, T>& 
       }
 
       if (p-> x > 3 && p->y > 3 && insideOrigImage){
-        
-        cout << "Rectangle points: " << points << endl;
-        cout << "Drawing line..." << endl;
         if(rotation == 0) {
           rotation = atan2(p[0].y, p[1].y);
-          cout << "Rotation: " << rotation << endl;
+          //cout << "Rotation: " << rotation << endl;
         }
         polylines(image, &p, &n, 1, true, colorArr[count%3], 3, LINE_AA);
-        count++;
+
+        Rect boundRect = boundingRect(points);
+        vector<Point2f> quad_pts, square_pts;
+
+        vector<Point> points_clone = points;
+        // cout << "Points: " << points_clone << endl;
+
+        Point2f topLeft, topRight, bottomLeft, bottomRight;
+        sort(points_clone.begin(), points_clone.end(), [](const Point& lhs, const Point& rhs){
+          return lhs.y < rhs.y;
+        });
+
+
+        if(points_clone[0].x > points_clone[1].x){
+           topLeft = points_clone[1];
+           topRight = points_clone[0];
+        } else {
+           topLeft = points_clone[0];
+           topRight = points_clone[1];
+        }
+
+        if(points_clone[2].x > points_clone[3].x){
+           bottomLeft = points_clone[3];
+           bottomRight = points_clone[2];
+        } else {
+           bottomLeft = points_clone[2];
+           bottomRight = points_clone[3];
+        }
+        
+        
+
+        quad_pts.push_back(topLeft);
+        quad_pts.push_back(bottomLeft);
+        quad_pts.push_back(topRight);
+        quad_pts.push_back(bottomRight);
+
+        square_pts.push_back(Point2f(boundRect.x, boundRect.y));
+        square_pts.push_back(Point2f(boundRect.x, boundRect.y + boundRect.height));
+        square_pts.push_back(Point2f(boundRect.x + boundRect.width, boundRect.y));
+        square_pts.push_back(Point2f(boundRect.x + boundRect.width, boundRect.y + boundRect.height));
+
+        rectangle(image,boundRect,Scalar(255,0,0),1,8,0);
+
+        Mat transmtx = getPerspectiveTransform(quad_pts,square_pts);
+        Mat transformed = Mat::zeros(image.rows, image.cols, CV_8UC3);
+        warpPerspective(originalImage, transformed, transmtx, image.size());
+        //imwrite("transformed.jpg", transformed);
+
+        Mat* ROI = new Mat(transformed, Rect(boundRect.x, boundRect.y, boundRect.width, boundRect.height));
+        //imwrite("cropped.jpg", *ROI);
+
+        return ROI;
       }
     }
-    return rotation;
+    return nullptr;
 }
 
 static Mat* expandImage( Mat& src ){
@@ -250,36 +307,34 @@ int main(int argc, char* argv[]){
   
   vector<vector<Point>> rectangles;
   Mat expandedImage = *expandImage(image);
+
+  Mat originalImageExpanded;
+  expandedImage.copyTo(originalImageExpanded);
+
   find_rectangles(expandedImage, rectangles);
 
   auto cmp = [](Rectangle a, Rectangle b) { return !a.equals(b); };
   set<Rectangle, decltype(cmp)> theRectangles(cmp);
 
-  //vector<Point> paper_limits = {Point(0,0), 
-  
   Point topLeft {(int) (0.05*image.cols), (int) (0.05*image.rows)};
   Point bottomLeft {(int) (0.05*image.cols), (int) (1.05*image.rows)};
 
-  cout << "Top: " << topLeft << ", BottomLeft: " << bottomLeft << endl;
+  //cout << "Top: " << topLeft << ", BottomLeft: " << bottomLeft << endl;
 
   for(vector<Point> p : rectangles){
-    cout << p << endl;
+    //cout << p << endl;
     if(distance(p[0],topLeft) < 5 && distance(p[1],bottomLeft) < 5){
       cout << "Ignoring this rectangle because it's basically a rectangle containing our picture." << endl;
       continue;
     }
     theRectangles.insert(Rectangle(p));
   }
-  double angle = drawRectangles(expandedImage, theRectangles, image.rows, image.cols);
-  Mat rotatedImage;
-  rotate(image, -angle, rotatedImage);
+  Mat* finalImage = drawRectangles(expandedImage, originalImageExpanded, theRectangles, image.rows, image.cols);
 
-
+  // Rotate by 180°
+  Mat rotatedFinal;
+  rotate(*finalImage, rotatedFinal, 1);
   
-  imwrite("output.jpg", expandedImage);
-  imwrite("rotated.jpg", rotatedImage);
-
-  //namedWindow(wndname, WINDOW_AUTOSIZE);
-  //imshow(wndname, image);
-  //waitKey(0);
+  imwrite(argv[2], rotatedFinal);
+  delete finalImage;
 }
