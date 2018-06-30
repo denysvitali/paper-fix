@@ -156,11 +156,11 @@ void find_rectangles(Mat& image, vector<vector<Point> >& rectangles)
     }
 }
 
-template <class T> static void drawRectangles( Mat& image, set<Rectangle, T>& rectangles, int rows, int cols )
+template <class T> static double drawRectangles( Mat& image, set<Rectangle, T>& rectangles, int rows, int cols )
 {
     auto cmp = [](Rectangle& f, Rectangle& s) { return f.area() <= s.area(); };
     priority_queue<Rectangle, std::vector<Rectangle>, decltype(cmp)> pq(cmp);
-    
+    double rotation = 0;
     int i = 0;
 
     cout << "Rectangles.size = " << rectangles.size() << endl;
@@ -178,7 +178,7 @@ template <class T> static void drawRectangles( Mat& image, set<Rectangle, T>& re
     vector<Scalar> colorArr = {Scalar(0,255,0),
       Scalar(0,0,255), Scalar(255,0,0)};
 
-    while(!pq.empty() && count < 3){
+    while(!pq.empty() && count < 1){
       const Rectangle& s = pq.top();
       pq.pop();
       vector<Point> points = s.vec();
@@ -198,12 +198,15 @@ template <class T> static void drawRectangles( Mat& image, set<Rectangle, T>& re
         
         cout << "Rectangle points: " << points << endl;
         cout << "Drawing line..." << endl;
+        if(rotation == 0) {
+          rotation = atan2(p[0].y, p[1].y);
+          cout << "Rotation: " << rotation << endl;
+        }
         polylines(image, &p, &n, 1, true, colorArr[count%3], 3, LINE_AA);
         count++;
       }
     }
-
-    //imshow(wndname, image);
+    return rotation;
 }
 
 static Mat* expandImage( Mat& src ){
@@ -220,6 +223,12 @@ static Mat* expandImage( Mat& src ){
 
 double distance(Point& p1, Point& p2){
   return sqrt(pow(p1.x - p2.x, 2) + pow(p1.y - p2.y, 2));
+}
+
+void rotate(cv::Mat& src, double angle, cv::Mat& dst){
+    cv::Point2f ptCp(src.cols*0.5, src.rows*0.5);
+    cv::Mat M = cv::getRotationMatrix2D(ptCp, angle, 1.0);
+    cv::warpAffine(src, dst, M, src.size(), cv::INTER_CUBIC); //Nearest is too rough, 
 }
 
 int main(int argc, char* argv[]){
@@ -261,10 +270,14 @@ int main(int argc, char* argv[]){
     }
     theRectangles.insert(Rectangle(p));
   }
-  drawRectangles(expandedImage, theRectangles, image.rows, image.cols);
+  double angle = drawRectangles(expandedImage, theRectangles, image.rows, image.cols);
+  Mat rotatedImage;
+  rotate(image, -angle, rotatedImage);
+
 
   
   imwrite("output.jpg", expandedImage);
+  imwrite("rotated.jpg", rotatedImage);
 
   //namedWindow(wndname, WINDOW_AUTOSIZE);
   //imshow(wndname, image);
