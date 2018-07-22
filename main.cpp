@@ -13,6 +13,7 @@ using namespace cv;
 using namespace std;
 
 const char* wndname = "Paper Fix";
+bool ROTATE_FLAG = false;
 
 static double calculateArea(const vector<Point>& rectangle) {
   Point prevPoint;
@@ -78,7 +79,9 @@ class Rectangle {
 
 void usage(int argc, char* argv[]){
   cout << "Usage: ";
-  cout << argv[0] << " input.jpg output.jpg" << endl;
+  cout << argv[0] << " [options] input.jpg output.jpg" << endl;
+  cout << "Options: " << endl;
+  cout << "-r / --rotate\t\tRotates the final image by 180° (upside down)" << endl;
 }
 
 static double angle( Point pt1, Point pt2, Point pt0 )
@@ -291,13 +294,23 @@ void rotate(cv::Mat& src, double angle, cv::Mat& dst){
 }
 
 int main(int argc, char* argv[]){
+
+  int options_pos = 1;
+  for(int i=1; i<argc; i++){
+    if(strcmp(argv[i], "-r") == 0 || strcmp(argv[i], "--rotate") == 0){
+      ROTATE_FLAG=true;
+      options_pos++;
+    }
+  }
+
   Mat image;
-  if(argc < 2){
+  if(options_pos + 2 > argc){
     cerr << "Invalid input" << endl;
     usage(argc, argv);
     return 1;
   }
-  image = imread(argv[1], CV_LOAD_IMAGE_COLOR);
+
+  image = imread(argv[options_pos], CV_LOAD_IMAGE_COLOR);
 
   if(!image.data){
     cerr << "No image data." << endl;
@@ -333,10 +346,15 @@ int main(int argc, char* argv[]){
   }
   Mat* finalImage = drawRectangles(expandedImage, originalImageExpanded, theRectangles, image.rows, image.cols);
 
-  // Rotate by 180°
-  Mat rotatedFinal;
-  rotate(*finalImage, rotatedFinal, 1);
-  
-  imwrite(argv[2], rotatedFinal);
+  if(ROTATE_FLAG){
+    // Rotate by 180°
+    Mat rotatedFinal;
+    rotate(*finalImage, rotatedFinal, 1);
+    imwrite(argv[options_pos + 1], rotatedFinal);
+  } else {
+    Mat outputImage = *finalImage;
+    imwrite(argv[options_pos + 1], outputImage);
+  }
+
   delete finalImage;
 }
