@@ -1,4 +1,6 @@
 test-image/
 *.out
 *.jpg
+.idea/
+cmake-build-debug/
 paperfix
