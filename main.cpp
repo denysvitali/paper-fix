@@ -126,7 +126,7 @@ void find_rectangles(Mat& image, vector<vector<Point> >& rectangles)
             }
 
             // Find contours and store them in a list
-            findContours(gray, contours, CV_RETR_LIST, CV_CHAIN_APPROX_SIMPLE);
+            findContours(gray, contours, RETR_LIST, CHAIN_APPROX_SIMPLE);
 
             // Test contours
             vector<Point> approx;
@@ -310,7 +310,7 @@ int main(int argc, char* argv[]){
     return 1;
   }
 
-  image = imread(argv[options_pos], CV_LOAD_IMAGE_COLOR);
+  image = imread(argv[options_pos]);
 
   if(!image.data){
     cerr << "No image data." << endl;
